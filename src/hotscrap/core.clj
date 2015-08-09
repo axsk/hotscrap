@@ -57,13 +57,22 @@
 (defn map-factors [Map]
   (merge-with / (map-winrates Map) (map-winrates :all)))
 
+(defn map-values [m f]
+  (reduce-kv #(assoc %1 %2 (f %3)) {} m))
+
 (defn counter 
   ([Map heroes class]
-    (sort-by val < 
-      (filter #(if (= class :all) true (= (heroclass (key %)) class))
-        (merge-with * (map-factors Map)
-          (apply merge-with + 
-            (vals (select-keys odds heroes)))))))
+    (let [heroes (clojure.string/split heroes #" ")]
+      (sort-by val >
+        (map-values (apply dissoc 
+          (->>
+            (vals (select-keys odds heroes))
+            (apply merge-with +)
+            (merge-with * (map-factors Map))
+            (filter #(or (= class :all) (= (heroclass (key %)) class)))
+            (into (sorted-map)))
+          heroes)
+          #(- 100 (/ % (count heroes)))))))
   ([Map heroes]
    (counter Map heroes :all))
 
