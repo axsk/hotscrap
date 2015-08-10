@@ -1,5 +1,4 @@
 (ns hotscrap.scrapper
-  (:gen-class)
 	(:require [clj-webdriver.taxi :refer :all]))
 
 (defn start-browser []
@@ -8,6 +7,16 @@
 (defn stringvals->float [hashmap]
   (zipmap (keys hashmap) (map read-string (vals hashmap))))
 
+(defn format-parsed [re-res]
+  (->>
+    re-res
+    (map #(drop 1 %))
+    (flatten)
+    (apply hash-map)
+    (stringvals->float)))
+
+;; parse hero odds, i.e. winrate of one hero vs another
+
 (defn parse-hero-odds [hero]
   (click (str "option[value*=\"" hero "\"]"))
   (Thread/sleep 1000)
@@ -15,15 +24,14 @@
   (->>
     (text (find-element {:tag :table, :id "DataTables_Table_0"}))
     (re-seq #"\n(.*) \d+ (\d\d\.\d)")
-    (map (fn [x] (drop 1 x)))
-    (flatten)
-    (apply hash-map)
-    (stringvals->float)))
+    (format-parsed)))
 
 (defn parse-odds []
 	(get-url "https://www.hotslogs.com/Sitewide/HeroDetails")
   (def allheroes (conj (map first (parse-hero-odds "Jaina")) "Jaina"))
-  (def odds (zipmap allheroes (map parse-hero-odds allheroes))))
+  (zipmap allheroes (map parse-hero-odds allheroes)))
+
+;; parse hero winrates for each map
 
 (def maptable 
   {:all "DataTables_Table_0"
@@ -40,23 +48,32 @@
   (->>
     (text (find-element {:tag :table, :id (maptable Map)}))
     (re-seq #"\n(.*) \d+ .*% (\d\d\.\d)")
-    (map #(drop 1 %))
-    (flatten)
-    (apply hash-map)
-    (stringvals->float)))
+    (format-parsed)))
 
 (defn parse-heroes-winrate []
   (get-url "https://www.hotslogs.com/sitewide/heroandmapstatistics")
-  (def map-winrates (zipmap (keys maptable) (map parse-map-winrate (keys maptable)))))
+  (let [allmaps (keys maptable)]
+    (zipmap allmaps (map parse-map-winrate allmaps))))
+
+;; parse winrates with each hero of a player 
 
 (defn parse-player-stats [playerid]
   (get-url (str "https://www.hotslogs.com/Player/Profile?PlayerID=" playerid))
   (->>
     (text (find-element {:tag :table, :id "ctl00_MainContent_RadGridCharacterStatistics_ctl00"}))
-    )
-)
+    (re-seq #"\n(.*) \d+ (\d+) .* (\d\d.\d)")
+    (map #(let [[_ hero games wr] %] {hero {:games (read-string games) :wr (read-string wr)}}))
+    (apply merge)))
 
-(defn scrapall [& args]
+(defn get-player-factors [player-stats hero-stats]
+)
+ 
+;; parse all played games of a player
+
+(defn parse-player-games [playerid]
+  )
+
+(defn scrapall []
   (start-browser)
-  (parse-odds)
-  (parse-heroes-winrate))
+  (def odds (parse-odds))
+  (def map-winrates (parse-heroes-winrate)))

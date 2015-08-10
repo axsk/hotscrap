@@ -1,7 +1,7 @@
 (ns hotscrap.core
   (:gen-class)
 	(:require ([clj-webdriver.taxi :refer :all])
-    [hotscrap.scrapper :refer :all]))
+    (hotscrap [scrapper :refer :all] ui)))
 
 ;; w warrior s support a assasin c specialist
 (def heroclass
