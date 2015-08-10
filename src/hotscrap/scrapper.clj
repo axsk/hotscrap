@@ -20,6 +20,9 @@
 
 ;; parse hero odds, i.e. winrate of one hero vs another
 
+(defn normalize-values [m]
+  (map-values #(double (- 1 (/ (bigdec %) 100))) m))
+
 (defn parse-hero-odds [hero]
   (println "parsing" hero)
   (click (str "option[value*=\"" hero "\"]"))
@@ -29,7 +32,7 @@
     (text (find-element {:tag :table, :id "DataTables_Table_0"}))
     (re-seq #"\n(.*) \d+ (\d\d\.\d)")
     (format-parsed)
-    (map-values #(- 1 (/ % 100)))))
+    normalize-values))
 
 (defn parse-odds []
 	(get-url "https://www.hotslogs.com/Sitewide/HeroDetails")
@@ -73,7 +76,11 @@
 ;; parse all played games of a player
 
 (defn parse-player-games [playerid]
+  (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
+  (->>
+    (click (find-element {:tag :button, :value "Expand"}))
   )
+)
 
 (defn scrapall []
   (start-browser)
