@@ -4,6 +4,9 @@
 (defn start-browser []
 	(set-driver! {:browser :chrome}))
 
+(defn map-values [f m]
+  (reduce-kv #(assoc %1 %2 (f %3)) {} m))
+
 (defn stringvals->float [hashmap]
   (zipmap (keys hashmap) (map read-string (vals hashmap))))
 
@@ -13,18 +16,20 @@
     (map #(drop 1 %))
     (flatten)
     (apply hash-map)
-    (stringvals->float)))
+    (map-values read-string)))
 
 ;; parse hero odds, i.e. winrate of one hero vs another
 
 (defn parse-hero-odds [hero]
+  (println "parsing" hero)
   (click (str "option[value*=\"" hero "\"]"))
   (Thread/sleep 1000)
   (click "a[href*=VsOther")
   (->>
     (text (find-element {:tag :table, :id "DataTables_Table_0"}))
     (re-seq #"\n(.*) \d+ (\d\d\.\d)")
-    (format-parsed)))
+    (format-parsed)
+    (map-values #(- 1 (/ % 100)))))
 
 (defn parse-odds []
 	(get-url "https://www.hotslogs.com/Sitewide/HeroDetails")

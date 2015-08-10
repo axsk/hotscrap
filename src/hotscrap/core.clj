@@ -1,7 +1,5 @@
 (ns hotscrap.core
-  (:gen-class)
-	(:require ([clj-webdriver.taxi :refer :all])
-    (hotscrap [scrapper :refer :all] )))
+	(:require (hotscrap [scrapper :refer [scrapall]])))
 
 ;; w warrior s support a assasin c specialist
 (def heroclass
@@ -11,32 +9,38 @@
   (def data (scrapall))
 )  
 
-(defn map-factors [mapdata Map]
-  (merge-with / (mapdata Map) (mapdata :all)))
+(defn odds [] (data :odds))
+(defn herowr 
+  ([mapname] (get-in data [:maps mapname]))
+  ([] (herowr :all)))
+(defn playerstats [playerid] (get-in data [:player :stats]))
 
-(defn player-factors [player-stats hero-stats]
-  (merge-with #(/ (:wr %1) %2) player-stats hero-stats)
-)
- 
-(defn map-values [m f]
+(defn map-factors [mapname]
+  (merge-with / (herowr mapname) (herowr)))
+
+(defn player-factors [playerid]
+  (merge-with #(/ (:wr %1) %2) (playerstats playerid) (herowr)))
+
+(defn map-values [f m]
   (reduce-kv #(assoc %1 %2 (f %3)) {} m))
 
+(defn sumodds [heroes]
+  (apply merge-with + (vals (select-keys (odds) heroes))))
+
 (defn counter 
-  ([Map heroes class]
+  ([{playerid :player mapname :map class :class :or {mapname :all class :all}} heroes]
     (let [heroes (clojure.string/split heroes #" ")]
       (sort-by val >
-        (map-values (apply dissoc 
-          (->>
-            (vals (select-keys (data :odds) heroes))
-            (apply merge-with +)
-            (merge-with * (map-factors (data :maps) Map))
+        (map-values #(/ % (count heroes))
+          (apply dissoc (->>
+            (sumodds heroes) 
+            (merge-with * (map-factors mapname))
+            ((if playerid
+             (partial merge-with * (player-factors playerid))
+             identity))
             (filter #(or (= class :all) (= (heroclass (key %)) class)))
             (into (sorted-map)))
-          heroes)
-          #(- 100 (/ % (count heroes)))))))
-  ([Map heroes]
-   (counter Map heroes :all))
-
+          heroes)))))
   ([heroes]
-    (counter :all heroes :all)))
+    (counter {} heroes)))
 
