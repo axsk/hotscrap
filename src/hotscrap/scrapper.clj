@@ -65,9 +65,6 @@
     (map #(let [[_ hero games wr] %] {hero {:games (read-string games) :wr (read-string wr)}}))
     (apply merge)))
 
-(defn get-player-factors [player-stats hero-stats]
-)
- 
 ;; parse all played games of a player
 
 (defn parse-player-games [playerid]
@@ -75,5 +72,6 @@
 
 (defn scrapall []
   (start-browser)
-  (def odds (parse-odds))
-  (def map-winrates (parse-heroes-winrate)))
+  {:odds (parse-odds),
+   :maps (parse-heroes-winrate) })
+
