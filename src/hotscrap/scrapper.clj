@@ -76,15 +76,19 @@
 ;; parse all played games of a player
 
 (defn parse-player-games [playerid]
+  (let [loading-panel "div[id*=LoadingPanel1ctl]"] 
   (start-browser)
   (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
-  (loop [n 1]
-    (click (element "button[value=Expand]"))
-    (while (not (element "div[id*=LoadingPanel1ctl]")) (Thread/sleep 10))
-    (while (element "div[id*=LoadingPanel1ctl]") (Thread/sleep 100))
-    (println (text (element (str "table[id*=Detail" n "]>tbody"))))
-    (if (element "button[value=Expand]")
-      (recur (inc n)))))
+  (doall (for [n (range (count(elements ".rgRow button[value=Expand]")))]
+    (do 
+      (click (nth (elements ".rgRow button[value=Expand]") n))
+      (wait-until #(exists? loading-panel))
+      (wait-until #(not(exists? loading-panel)))
+      (let [result (text (element "table[id*=Detail]>tbody"))]
+        (click (element "button[value=Collapse]"))
+        (wait-until #(exists? loading-panel))
+        (wait-until #(not(exists? loading-panel)))
+        result))))))
 
 (defn scrapall []
   (start-browser)
