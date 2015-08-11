@@ -76,11 +76,15 @@
 ;; parse all played games of a player
 
 (defn parse-player-games [playerid]
+  (start-browser)
   (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
-  (->>
-    (click (find-element {:tag :button, :value "Expand"}))
-  )
-)
+  (loop [n 1]
+    (click (element "button[value=Expand]"))
+    (while (not (element "div[id*=LoadingPanel1ctl]")) (Thread/sleep 10))
+    (while (element "div[id*=LoadingPanel1ctl]") (Thread/sleep 100))
+    (println (text (element (str "table[id*=Detail" n "]>tbody"))))
+    (if (element "button[value=Expand]")
+      (recur (inc n)))))
 
 (defn scrapall []
   (start-browser)

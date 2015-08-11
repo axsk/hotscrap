@@ -59,3 +59,17 @@
     (counter {} heroes)))
 
 
+(defn hero-strengths [hero]
+  (let [allmaps [:boe :bb :ch :ds :got :hm :st :tsq]]
+    (zipmap allmaps (map #(% hero) (map map-factors allmaps)))))
+
+(defn print-herostrengths [] 
+  (clojure.pprint/print-table 
+    [:name :boe :bb :ch :ds :got :hm :st :tsq] 
+    (map 
+      #(assoc 
+         (map-values 
+           (fn [n] (format "%.3f" n)) 
+           (hero-strengths %)) 
+         :name %) 
+      (keys heroclass))))
