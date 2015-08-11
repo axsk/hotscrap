@@ -8,17 +8,17 @@
 (def myheroes
   #{"Thrall" "Nazeebo" "Zagara" "Tyrael" "Anub'arak" "Zeratul" "Rehgar" "Kerrigan" "Raynor" "Brightwing" "Arthas" "Tyrande" "The Lost Vikings" "Tychus" "Illidan" "Sonya" "Nova" "Tassadar" "Diablo" "E.T.C." "Stitches"})
 
-(defn -main [& args]
-  (loaddata)
-)  
+(defn loaddata []
+  (def data (read-string (slurp "data.edn"))))
 
 (defn savedata []
   (spit "data.edn" (pr-str data)))
 
-(defn loaddata []
-  (def data (read-string (slurp "data.edn"))))
+(defn -main [& args]
+  (loaddata))
 
 (defn odds [] (data :odds))
+
 (defn herowr 
   ([mapname] (get-in data [:maps mapname]))
   ([] (herowr :all)))
