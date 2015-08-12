@@ -41,14 +41,14 @@
 
 ;; parse hero winrates for each map
 
-(def maptable 
+(def maptable
   {:all "DataTables_Table_0"
    :boe "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl06_Detail10"
    :bb  "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl09_Detail20"
    :ch  "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl12_Detail30"
    :ds  "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl15_Detail40"
    :got "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl18_Detail50"
-   :hm  "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl21_Detail60" 
+   :hm  "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl21_Detail60"
    :st  "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl24_Detail70"
    :tsq "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl27_Detail80"})
 
@@ -63,7 +63,7 @@
   (let [allmaps (keys maptable)]
     (zipmap allmaps (map parse-map-winrate allmaps))))
 
-;; parse winrates with each hero of a player 
+;; parse winrates with each hero of a player
 
 (defn parse-player-stats [playerid]
   (get-url (str "https://www.hotslogs.com/Player/Profile?PlayerID=" playerid))
@@ -75,36 +75,60 @@
 
 ;; parse all played games of a player
 
-(defn parse-game [head game]
-  "taking the text representaion of a game-table, return a map to the sets of winning and losing heroes"
+(defn wait-loaded []
+  (let [loading-panel "div[id*=LoadingPanel1ctl]"]
+    (wait-until #(exists? loading-panel) 20000)
+    (wait-until #(not(exists? loading-panel)) 20000)))
+
+(defn expand [n]
+  (click (nth (elements ".rgRow button[value=Expand]") n))
+  (wait-loaded))
+
+(defn collapse []
+  (click (element "button[value=Collapse]"))
+  (wait-loaded))
+
+(defn parse-game [n]
   (defn win? [w] (= w ""))
-  (let [[ [_ h1 w1] [_ h2 _] [_ h3 _] [_ h4 _] [_ h5 _]
-          [_ h6 w2] [_ h7 _] [_ h8 _] [_ h9 _] [_ h10 _]]
-        (re-seq #"\n[\s]*[^\s]+ (.*) \d+ \d+ (-?)\d+" game)
-        [[_ mapname]] (re-seq #"(.*?) \d.*" head)]
-    { :map mapname (win? w1) #{h1 h2 h3 h4 h5} (win? w2) #{h6 h7 h8 h9 h10}}
-     ))
+  (expand n)
+  (let [head (text(element(str "[id$=__" n "]")))
+        game (text(element "table[id*=Detail]>tbody"))
+        [[_ h1 w1] [_ h2 _] [_ h3 _] [_ h4 _] [_ h5 _]
+         [_ h6 w2] [_ h7 _] [_ h8 _] [_ h9 _] [_ h10 _]]
+          (re-seq #"\n[\s]*[^\s]+ (.*) \d+ \d+ (-?)\d+" game)
+        [[_ mapname]]
+          (re-seq #"(.*?) \d.*" head)]
+    (collapse)
+    {:map mapname
+     (win? w1) #{h1 h2 h3 h4 h5}
+     (win? w2) #{h6 h7 h8 h9 h10}}))
+
+(defn number-of-games [] (count (elements ".rgRow button[value=Expand]")))
+
+(defn next-page []
+  (try
+    (do
+      (click ".rgCurrentPage+a")
+      (wait-loaded)
+      true)
+    (catch org.openqa.selenium.NoSuchElementException e
+      false)))
 
 (defn scrap-player-games [playerid]
-  (defn wait-loaded []
-    (let [loading-panel "div[id*=LoadingPanel1ctl]"] 
-      (wait-until #(exists? loading-panel) 20000)
-      (wait-until #(not(exists? loading-panel)) 20000)))
   (start-browser)
   (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
-  (vec (doall
-    (for [n (range (count(elements ".rgRow button[value=Expand]")))]
-    (do 
-      (click (nth (elements ".rgRow button[value=Expand]") n))
-      (wait-loaded)
-      (let [result (parse-game
-                    (text(element(str "[id$=__" n "]")))
-                    (text(element "table[id*=Detail]>tbody")))]
-        (click (element "button[value=Collapse]"))
-        (wait-loaded)
-        result))))))
-  
+  (loop [n 0
+         games []]
+    (if (< n (number-of-games))
+      (recur (inc n) (conj games (parse-game n)))
+      (if (next-page)
+        (recur 0 games)
+        (games)))))
+
 (defn scrapall []
   (start-browser)
   {:odds (parse-odds)
    :stats (parse-heroes-winrate)})
+
+(defn scrapme []
+  {:games (scrap-player-games 1220651)})

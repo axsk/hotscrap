@@ -19,7 +19,7 @@
 
 (defn odds [] (data :odds))
 
-(defn herowr 
+(defn herowr
   ([mapname] (get-in data [:stats mapname]))
   ([] (herowr :all)))
 (defn playerstats [playerid] (get-in data [:player :stats]))
@@ -38,15 +38,15 @@
 
 (defn averageodds [heroes]
   (map-values #(/ % (count heroes))
-    (apply merge-with + 
+    (apply merge-with +
       (vals (select-keys (odds) heroes)))))
 
-(defn counter 
+(defn counter
   ([{playerid :player mapname :map class :class :or {mapname :all class :all}} heroes]
       (let [heroes (clojure.string/split heroes #" ")]
       (sort-by val >
         (apply dissoc (->>
-          (averageodds heroes) 
+          (averageodds heroes)
           (merge-with * (map-factors mapname))
           ((if playerid
            (partial merge-with * (player-factors playerid))
@@ -65,7 +65,7 @@
 
 (defn winners [game] (game true))
 (defn losers  [game] (game false))
-(defn tuples [players] 
+(defn tuples [players]
   (for [a (range 5)
         b (range (inc a) 5)]
     #{((vec players) a) ((vec players) b)}))
@@ -78,13 +78,13 @@
       (for [[tuple sum] sums :when (> sum mingames)]
         [tuple (/ (if (contains? wins tuple) (wins tuple) 0) sum)]))))
 
-(defn print-herostrengths [] 
-  (clojure.pprint/print-table 
-    [:name :boe :bb :ch :ds :got :hm :st :tsq] 
-    (map 
-      #(assoc 
-         (map-values 
-           (fn [n] (format "%.3f" n)) 
-           (hero-strengths %)) 
-         :name %) 
+(defn print-herostrengths []
+  (clojure.pprint/print-table
+    [:name :boe :bb :ch :ds :got :hm :st :tsq]
+    (map
+      #(assoc
+         (map-values
+           (fn [n] (format "%.3f" n))
+           (hero-strengths %))
+         :name %)
       (keys heroclass))))
