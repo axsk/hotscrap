@@ -20,7 +20,7 @@
 (defn odds [] (data :odds))
 
 (defn herowr 
-  ([mapname] (get-in data [:maps mapname]))
+  ([mapname] (get-in data [:stats mapname]))
   ([] (herowr :all)))
 (defn playerstats [playerid] (get-in data [:player :stats]))
 
@@ -62,6 +62,21 @@
 (defn hero-strengths [hero]
   (let [allmaps [:boe :bb :ch :ds :got :hm :st :tsq]]
     (zipmap allmaps (map #(% hero) (map map-factors allmaps)))))
+
+(defn winners [game] (game true))
+(defn losers  [game] (game false))
+(defn tuples [players] 
+  (for [a (range 5)
+        b (range (inc a) 5)]
+    #{((vec players) a) ((vec players) b)}))
+
+(defn herotuples [games mingames]
+  (let [wins (frequencies (mapcat (comp tuples winners) games))
+        loss (frequencies (mapcat (comp tuples losers) games))
+        sums (merge-with + wins loss)]
+    (into {}
+      (for [[tuple sum] sums :when (> sum mingames)]
+        [tuple (/ (if (contains? wins tuple) (wins tuple) 0) sum)]))))
 
 (defn print-herostrengths [] 
   (clojure.pprint/print-table 

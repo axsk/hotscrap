@@ -88,11 +88,12 @@
 (defn scrap-player-games [playerid]
   (defn wait-loaded []
     (let [loading-panel "div[id*=LoadingPanel1ctl]"] 
-      (wait-until #(exists? loading-panel))
-      (wait-until #(not(exists? loading-panel)))))
+      (wait-until #(exists? loading-panel) 20000)
+      (wait-until #(not(exists? loading-panel)) 20000)))
   (start-browser)
   (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
-  (doall (for [n (range 3)];;(range (count(elements ".rgRow button[value=Expand]")))]
+  (vec (doall
+    (for [n (range (count(elements ".rgRow button[value=Expand]")))]
     (do 
       (click (nth (elements ".rgRow button[value=Expand]") n))
       (wait-loaded)
@@ -101,10 +102,9 @@
                     (text(element "table[id*=Detail]>tbody")))]
         (click (element "button[value=Collapse]"))
         (wait-loaded)
-        result)))))
+        result))))))
   
 (defn scrapall []
   (start-browser)
-  {:odds (parse-odds),
-   :maps (parse-heroes-winrate) })
-
+  {:odds (parse-odds)
+   :stats (parse-heroes-winrate)})
