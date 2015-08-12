@@ -114,16 +114,18 @@
     (catch org.openqa.selenium.NoSuchElementException e
       false)))
 
-(defn scrap-player-games [playerid]
+(defn scrap-player-games [playerid maxgames]
   (start-browser)
   (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
   (loop [n 0
          games []]
-    (if (< n (number-of-games))
-      (recur (inc n) (conj games (parse-game n)))
-      (if (next-page)
-        (recur 0 games)
-        (games)))))
+    (if (= maxgames (count(games)))
+      games
+      (if (< n (number-of-games))
+        (recur (inc n) (conj games (parse-game n)))
+        (if (next-page)
+          (recur 0 games)
+          (games))))))
 
 (defn scrapall []
   (start-browser)
@@ -131,4 +133,4 @@
    :stats (parse-heroes-winrate)})
 
 (defn scrapme []
-  {:games (scrap-player-games 1220651)})
+  {:games (scrap-player-games 1220651 200)})
