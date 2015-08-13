@@ -85,23 +85,38 @@
   (wait-loaded))
 
 (defn collapse []
-  (click (element "button[value=Collapse]"))
+  (click "button[value=Collapse]")
   (wait-loaded))
+
+(defn parse-player-ids []
+  (for [a (elements "table[id*=Detail] a[href^='/Player/Profile?']")]
+    (->>
+     (attribute a :href)
+     (re-find #"PlayerID=(\d+)")
+     (last)
+     (read-string))))
+
+(defn parse-player-heroes []
+  (for [[_ h w] (->>
+                 (text "table[id*=Detail]>tbody")
+                 (re-seq #"\n[\s]*[^\s]+ (.*) \d+ \d+ (-?)\d+"))]
+    {:hero h, :win (= w "")}))
+
+(defn parse-mapname [n]
+  (->>
+   (text (str "[id$=__" n "]"))
+   (re-find #"(.*?) \d.*")
+   (last)))
 
 (defn parse-game [n]
   (defn win? [w] (= w ""))
   (expand n)
-  (let [head (text(element(str "[id$=__" n "]")))
-        game (text(element "table[id*=Detail]>tbody"))
-        [[_ h1 w1] [_ h2 _] [_ h3 _] [_ h4 _] [_ h5 _]
-         [_ h6 w2] [_ h7 _] [_ h8 _] [_ h9 _] [_ h10 _]]
-          (re-seq #"\n[\s]*[^\s]+ (.*) \d+ \d+ (-?)\d+" game)
-        [[_ mapname]]
-          (re-seq #"(.*?) \d.*" head)]
+  (let [game {:map (parse-mapname n)
+              :players (doall (map #(assoc %1 :pid %2)
+                                   (parse-player-heroes)
+                                   (parse-player-ids)))}]
     (collapse)
-    {:map mapname
-     (win? w1) #{h1 h2 h3 h4 h5}
-     (win? w2) #{h6 h7 h8 h9 h10}}))
+    game))
 
 (defn number-of-games [] (count (elements ".rgRow button[value=Expand]")))
 
