@@ -88,3 +88,19 @@
            (hero-strengths %))
          :name %)
       (keys heroclass))))
+
+;; TODO check stats vs maps
+;; uniform percentage handling
+(defn rel-odds [hero]
+  (dissoc
+    (merge-with #(* 100 (/ %1 %2))
+                (get-in data [:odds hero])
+                (get-in data [:stats :all]))
+    hero))
+
+(defn show [res]
+  (let [sorted (sort-by val > res)]
+    clojure.pprint/pprint [(take 10 sorted) (take-last 10 sorted)]))
+
+(defn table [method subj]
+  (clojure.pprint/print-table subj (map method subj)))
