@@ -5,8 +5,8 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.7.0"]
 		[clj-webdriver "0.7.1"]
-		[org.seleniumhq.selenium/selenium-java "2.47.0"]
-		[hickory "LATEST"]]
+		[org.seleniumhq.selenium/selenium-java "2.47.0"]]
+  :plugins [[cider/cider-nrepl "0.9.1"]]
   :main ^:skip-aot hotscrap.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})
