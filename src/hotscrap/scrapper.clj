@@ -1,8 +1,9 @@
 (ns hotscrap.scrapper
 	(:require [clj-webdriver.taxi :refer :all]))
 
-(defn start-browser []
-	(set-driver! {:browser :chrome}))
+(defn start-browser
+  ([] (start-browser :chrome))
+  ([driver] (set-driver! {:browser driver})))
 
 (defn map-values [f m]
   (reduce-kv #(assoc %1 %2 (f %3)) {} m))
@@ -134,7 +135,7 @@
   (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
   (loop [n 0
          games []]
-    (if (= maxgames (count(games)))
+    (if (= maxgames (count games))
       games
       (if (< n (number-of-games))
         (recur (inc n) (conj games (parse-game n)))
