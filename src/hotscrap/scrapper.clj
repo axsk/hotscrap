@@ -103,21 +103,21 @@
                  (re-seq #"\n[\s]*[^\s]+ (.*) \d+ \d+ (-?)\d+"))]
     {:hero h, :win (= w "")}))
 
-(defn parse-mapname [n]
+(defn parse-map-and-time [n]
   (->>
    (text (str "[id$=__" n "]"))
-   (re-find #"(.*?) \d.*")
-   (last)))
+   (re-find #"(.*?) \d.*(\d\d\.\d\d\.\d{4} \d\d:\d\d:\d\d)")
+   (rest)))
 
 (defn parse-game [n]
-  (defn win? [w] (= w ""))
-  (expand n)
-  (let [game {:map (parse-mapname n)
-              :players (doall (map #(assoc %1 :pid %2)
-                                   (parse-player-heroes)
-                                   (parse-player-ids)))}]
-    (collapse)
-    game))
+  (let [[map time] (parse-map-and-time n)]
+    (expand n)
+    (let [game {:map map, :time time
+                :players (doall (map #(assoc %1 :pid %2)
+                                     (parse-player-heroes)
+                                     (parse-player-ids)))}]
+      (collapse)
+      game)))
 
 (defn number-of-games [] (count (elements ".rgRow button[value=Expand]")))
 
