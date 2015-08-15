@@ -5,40 +5,46 @@
   ([] (start-browser :chrome))
   ([driver] (set-driver! {:browser driver})))
 
+(def browser :chrome)
+
 (defn map-values [f m]
   (reduce-kv #(assoc %1 %2 (f %3)) {} m))
 
-(defn stringvals->float [hashmap]
-  (zipmap (keys hashmap) (map read-string (vals hashmap))))
+(def allheroes '("Abathur" "Anub'arak" "Arthas" "Azmodan" "Brightwing" "Chen" "Diablo" "E.T.C." "Falstad" "Gazlowe" "Illidan" "Jaina" "Johanna" "Kael'thas" "Kerrigan" "Leoric" "Li Li" "Malfurion" "Muradin" "Murky" "Nazeebo" "Nova" "Raynor" "Rehgar" "Sgt. Hammer" "Sonya" "Stitches" "Sylvanas" "Tassadar" "The Butcher" "The Lost Vikings" "Thrall" "Tychus" "Tyrael" "Tyrande" "Uther" "Valla" "Zagara" "Zeratul"))
 
 (defn format-parsed [re-res]
   (->>
-    re-res
-    (map #(drop 1 %))
-    (flatten)
-    (apply hash-map)
-    (map-values read-string)))
+   re-res
+   (map #(drop 1 %))
+   (flatten)
+   (apply hash-map)
+   (map-values read-string)))
 
-;; parse hero odds, i.e. winrate of one hero vs another
-
-(defn normalize-values [m]
+(defn normalize-values
+  "[70 55] -> [0.3 0.45]"
+  [m]
   (map-values #(double (- 1 (/ (bigdec %) 100))) m))
 
-(defn parse-hero-odds [hero]
-  (println "parsing" hero)
-  (click (str "option[value*=\"" hero "\"]"))
-  (Thread/sleep 1000)
-  (click "a[href*=VsOther")
-  (->>
-    (text (find-element {:tag :table, :id "DataTables_Table_0"}))
-    (re-seq #"\n(.*) \d+ (\d\d\.\d)")
-    (format-parsed)
-    normalize-values))
+(defn parse-hero-odds
+  "compute the winrates of all other heroes against the given hero"
+  [hero]
+  (let [heroselect (str "option[value*=\"" hero "\"]")
+        vsotherbtn "a[href*=VsOther]"
+        oddtable "table#DataTables_Table_0"]
+    (println  "Scrapping" hero)
+    (click heroselect)
+    (Thread/sleep 500)
+    (click vsotherbtn)
+    (->>
+     (text oddtable)
+     (re-seq #"\n(.*) \d+ (\d\d\.\d)")
+     (format-parsed)
+     normalize-values)))
 
-(defn parse-odds []
-	(get-url "https://www.hotslogs.com/Sitewide/HeroDetails")
-  (def allheroes (conj (map first (parse-hero-odds "Jaina")) "Jaina"))
-  (zipmap allheroes (map parse-hero-odds allheroes)))
+(defn scrap-odds "get the odds of all heroes vs all others" []
+  (with-driver {:browser browser}
+	  (get-url "https://www.hotslogs.com/Sitewide/HeroDetails")
+    (zipmap allheroes (map parse-hero-odds allheroes))))
 
 ;; parse hero winrates for each map
 
@@ -53,26 +59,30 @@
    :st  "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl24_Detail70"
    :tsq "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl27_Detail80"})
 
-(defn parse-map-winrate [Map]
+(defn parse-heroes-map [Map]
   (->>
-    (text (find-element {:tag :table, :id (maptable Map)}))
+    (text (str "#" (maptable Map)))
     (re-seq #"\n(.*) \d+ .*% (\d\d\.\d)")
     (format-parsed)))
 
-(defn parse-heroes-winrate []
-  (get-url "https://www.hotslogs.com/sitewide/heroandmapstatistics")
-  (let [allmaps (keys maptable)]
-    (zipmap allmaps (map parse-map-winrate allmaps))))
+(defn scrap-heroes "get heroes winrates on all maps" []
+  "Scrapping hero winrates on all maps"
+  (with-driver {:browser browser}
+    (get-url "https://www.hotslogs.com/sitewide/heroandmapstatistics")
+    (let [allmaps (keys maptable)]
+      (zipmap allmaps (map parse-map-winrate allmaps)))))
 
 ;; parse winrates with each hero of a player
 
-(defn parse-player-stats [playerid]
-  (get-url (str "https://www.hotslogs.com/Player/Profile?PlayerID=" playerid))
-  (->>
-    (text (find-element {:tag :table, :id "ctl00_MainContent_RadGridCharacterStatistics_ctl00"}))
-    (re-seq #"\n(.*) \d+ (\d+) .* (\d\d.\d)")
-    (map #(let [[_ hero games wr] %] {hero {:games (read-string games) :wr (read-string wr)}}))
-    (apply merge)))
+(defn scrap-player-stats [playerid]
+  (with-driver {:browser browser}
+    (get-url (str "https://www.hotslogs.com/Player/Profile?PlayerID=" playerid))
+    (->>
+     (text "#ctl00_MainContent_RadGridCharacterStatistics_ctl00")
+     (re-seq #"\n(.*) \d+ (\d+) .* (\d\d.\d)")
+     (map #(let [[_ hero games wr] %] {hero {:games (read-string games) :wr (read-string wr)}}))
+     (apply merge)
+     (hash-map playerid))))
 
 ;; parse all played games of a player
 
@@ -98,9 +108,10 @@
      (read-string))))
 
 (defn parse-player-heroes []
-  (for [[_ h w] (->>
-                 (text "table[id*=Detail]>tbody")
-                 (re-seq #"\n[\s]*[^\s]+ (.*) \d+ \d+ (-?)\d+"))]
+  (for [[_ h w]
+        (->>
+         (text "table[id*=Detail]>tbody")
+         (re-seq #"\n[\s]*[^\s]+ (.*) \d+ \d+ (-?)\d+"))]
     {:hero h, :win (= w "")}))
 
 (defn parse-map-and-time [n]
@@ -131,6 +142,7 @@
       false)))
 
 (defn scrap-player-games [playerid maxgames]
+  (println "Scrapping games of " playerid)
   (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
   (loop [n 0
          games []]
@@ -142,21 +154,17 @@
           (recur 0 games)
           (games))))))
 
-(defn scrap-players [playerids maxgames]
+(defn scrap-games [playerids maxgames]
   (apply concat
     (pmap (fn [pid]
             (with-driver {:browser :chrome}
             (scrap-player-games pid maxgames)))
         playerids)))
 
-(defn test []
-  (scrap-players [1220651 1247020 1220651 1220651] 3)
-  )
+;; convenience functions for testing
 
-(defn scrapall []
-  (start-browser)
-  {:odds (parse-odds)
-   :stats (parse-heroes-winrate)})
-
-(defn scrapme []
-  {:games (scrap-player-games 1220651 200)})
+(defn scrap-all []
+  {:odds (scrap-odds)
+   :heroes (scrap-heroes)
+   :games (scrap-games [1220651] 10)
+   :players (scrap-player-stats 1220651)})
