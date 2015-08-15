@@ -106,13 +106,13 @@
 (defn parse-map-and-time [n]
   (->>
    (text (str "[id$=__" n "]"))
-   (re-find #"(.*?) \d.*(\d\d\.\d\d\.\d{4} \d\d:\d\d:\d\d)")
+   (re-find #"(.*?) \d.*(\d+/\d+/\d{4} \d+:\d+:\d+)")
    (rest)))
 
 (defn parse-game [n]
-  (let [[map time] (parse-map-and-time n)]
+  (let [[mapname time] (parse-map-and-time n)]
     (expand n)
-    (let [game {:map map, :time time
+    (let [game {:map mapname, :time time
                 :players (doall (map #(assoc %1 :pid %2)
                                      (parse-player-heroes)
                                      (parse-player-ids)))}]
@@ -131,7 +131,6 @@
       false)))
 
 (defn scrap-player-games [playerid maxgames]
-  (start-browser)
   (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
   (loop [n 0
          games []]
@@ -142,6 +141,17 @@
         (if (next-page)
           (recur 0 games)
           (games))))))
+
+(defn scrap-players [playerids maxgames]
+  (apply concat
+    (pmap (fn [pid]
+            (with-driver {:browser :chrome}
+            (scrap-player-games pid maxgames)))
+        playerids)))
+
+(defn test []
+  (scrap-players [1220651 1247020 1220651 1220651] 3)
+  )
 
 (defn scrapall []
   (start-browser)
