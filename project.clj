@@ -7,7 +7,8 @@
                  [clj-webdriver "0.7.2"]
                  [org.seleniumhq.selenium/selenium-java "2.47.1"]
                  [com.codeborne/phantomjsdriver "1.2.1" :exclusions [org.seleniumhq.selenium/selenium-remote-driver]]]
-  :plugins [[cider/cider-nrepl "0.9.1"]]
+  :plugins [[cider/cider-nrepl "0.10.0-SNAPSHOT"]
+            [refactor-nrepl "1.1.0-SNAPSHOT"]]
   :main ^:skip-aot hotscrap.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})

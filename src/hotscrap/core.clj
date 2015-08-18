@@ -1,5 +1,5 @@
 (ns hotscrap.core
-	(:require (hotscrap [scrapper :refer [scrapall]])))
+	(:require [hotscrap.scrapper]))
 
 ;; w warrior s support a assasin c specialist
 (def heroclass
@@ -63,20 +63,37 @@
   (let [allmaps [:boe :bb :ch :ds :got :hm :st :tsq]]
     (zipmap allmaps (map #(% hero) (map map-factors allmaps)))))
 
-(defn winners [game] (game true))
-(defn losers  [game] (game false))
-(defn tuples [players]
+(defn tuples
+  "given a collection of 5 players,
+  return a set of lists of all possible
+  combinations of those players"
+  [players]
   (for [a (range 5)
         b (range (inc a) 5)]
     #{((vec players) a) ((vec players) b)}))
 
-(defn herotuples [games mingames]
-  (let [wins (frequencies (mapcat (comp tuples winners) games))
-        loss (frequencies (mapcat (comp tuples losers) games))
-        sums (merge-with + wins loss)]
-    (into {}
-      (for [[tuple sum] sums :when (> sum mingames)]
-        [tuple (/ (if (contains? wins tuple) (wins tuple) 0) sum)]))))
+(defn winners [game]
+  (filter #(%1 :win) (game :players)))
+
+(defn losers [game]
+  (filter #(not (%1 :win)) (game :players)))
+
+(defn heronames [players]
+  (map #(% :hero) players))
+
+(defn herotuples
+  "given a collection of games, return the winrates for all tuples of heroes when more then mingames games are given as evidence"
+  ([games mingames]
+   (let [wins (frequencies (mapcat (comp tuples heronames winners) games))
+         loss (frequencies (mapcat (comp tuples heronames losers) games))
+         sums (merge-with + wins loss)]
+     (into {}
+           (for [[tuple sum] sums :when (> sum mingames)]
+             [tuple (/ (if (contains? wins tuple)
+                         (wins tuple)
+                         0)
+                       sum)]))))
+  ([games] (herotuples games 10)))
 
 (defn print-herostrengths []
   (clojure.pprint/print-table
@@ -97,6 +114,9 @@
                 (get-in data [:odds hero])
                 (get-in data [:stats :all]))
     hero))
+
+(defn rel-odds [hero])
+
 
 (defn show [res]
   (let [sorted (sort-by val > res)]

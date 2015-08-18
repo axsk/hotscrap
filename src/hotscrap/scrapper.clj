@@ -1,5 +1,6 @@
 (ns hotscrap.scrapper
-	(:require [clj-webdriver.taxi :refer :all]))
+	(:require [clj-webdriver.taxi :refer :all]
+            [clojure.set]))
 
 (defn start-browser
   ([] (start-browser :chrome))
@@ -33,7 +34,7 @@
         oddtable "table#DataTables_Table_0"]
     (println  "Scrapping" hero)
     (click heroselect)
-    (Thread/sleep 500)
+    (Thread/sleep 1000)
     (click vsotherbtn)
     (->>
      (text oddtable)
@@ -59,7 +60,7 @@
    :st  "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl24_Detail70"
    :tsq "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl27_Detail80"})
 
-(defn parse-heroes-map [Map]
+(defn parse-map [Map]
   (->>
     (text (str "#" (maptable Map)))
     (re-seq #"\n(.*) \d+ .*% (\d\d\.\d)")
@@ -70,7 +71,7 @@
   (with-driver {:browser browser}
     (get-url "https://www.hotslogs.com/sitewide/heroandmapstatistics")
     (let [allmaps (keys maptable)]
-      (zipmap allmaps (map parse-map-winrate allmaps)))))
+      (zipmap allmaps (map parse-map allmaps)))))
 
 ;; parse winrates with each hero of a player
 
@@ -143,28 +144,74 @@
 
 (defn scrap-player-games [playerid maxgames]
   (println "Scrapping games of " playerid)
-  (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
-  (loop [n 0
-         games []]
-    (if (= maxgames (count games))
-      games
-      (if (< n (number-of-games))
-        (recur (inc n) (conj games (parse-game n)))
-        (if (next-page)
-          (recur 0 games)
-          (games))))))
+  (try 
+    (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
+    (set 
+     (loop [n 0
+            games []]
+       (if (= maxgames (count games))
+         games
+         (if (< n (number-of-games))
+           (recur (inc n) (conj games (parse-game n)))
+           (if (next-page)
+             (recur 0 games)
+             games)))))
+    (catch Exception e
+      (prn "Caught "e)
+      [])))
+
+(defn par-scrap-games [playerids maxgames]
+  (apply clojure.set/union
+         (pmap (fn [pid]
+                 (with-driver {:browser browser}
+                   (scrap-player-games pid maxgames)))
+               playerids)))
+
+(def MAXBROWSERS 4)
 
 (defn scrap-games [playerids maxgames]
-  (apply concat
-    (pmap (fn [pid]
-            (with-driver {:browser :chrome}
-            (scrap-player-games pid maxgames)))
-        playerids)))
+  (loop [results #{}
+         pidpart (partition MAXBROWSERS MAXBROWSERS nil playerids)]
+    (if (empty? pidpart)
+      results
+      (recur
+       (clojure.set/union results
+                          (par-scrap-games (first pidpart) maxgames))
+       (rest pidpart)))))
 
-;; convenience functions for testing
+(defn all-players [games]
+  (distinct
+   (for [{ps :players} games
+         {p  :pid}     ps]
+     p)))
 
-(defn scrap-all []
-  {:odds (scrap-odds)
-   :heroes (scrap-heroes)
-   :games (scrap-games [1220651] 10)
-   :players (scrap-player-stats 1220651)})
+;; PUBLIC API
+;; top-level functions to actually parse the data
+
+(defn update-static [data]
+  (->
+   data
+   (assoc :odds (scrap-odds))
+   (assoc :heroes (scrap-heroes))))
+
+(defn update-games
+  "scrap maxgames games of the given playerids collection and update them into data"
+  [data playerids maxgames]
+  (assoc data :games
+         (clojure.set/union
+          (data :games)
+          (scrap-games playerids maxgames))))
+
+(defn auto-update-games 
+  "randomly choose np known players and update the latest ng games of them into data"
+  [data np ng]
+  (update-games data
+                (repeatedly np
+                            #(rand-nth (all-players (data :games))))
+                ng))
+
+(defn update-players [data players]
+  (->>
+   (apply merge  (map scrap-player-stats players))
+   (merge (data :players))
+   (assoc data :players)))
