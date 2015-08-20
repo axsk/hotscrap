@@ -2,11 +2,14 @@
 	(:require [clj-webdriver.taxi :refer :all]
             [clojure.set]))
 
+(if-not (resolve 'data)
+  (def data {}))
+(def MAXBROWSERS 4)
+(def browser :chrome)
+
 (defn start-browser
   ([] (start-browser :chrome))
   ([driver] (set-driver! {:browser driver})))
-
-(def browser :chrome)
 
 (defn map-values [f m]
   (reduce-kv #(assoc %1 %2 (f %3)) {} m))
@@ -50,6 +53,7 @@
 ;; parse hero winrates for each map
 
 (def maptable
+
   {:all "DataTables_Table_0"
    :boe "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl06_Detail10"
    :bb  "ctl00_MainContent_RadGridMapStatistics_ctl00_ctl09_Detail20"
@@ -90,7 +94,8 @@
 (defn wait-loaded []
   (let [loading-panel "div[id*=LoadingPanel1ctl]"]
     (wait-until #(exists? loading-panel) 20000)
-    (wait-until #(not(exists? loading-panel)) 20000)))
+    (wait-until #(not(exists? loading-panel)) 20000))
+  (Thread/sleep 50))
 
 (defn expand [n]
   (click (nth (elements ".rgRow button[value=Expand]") n))
@@ -123,20 +128,21 @@
 
 (defn knowngames []
   (set
-   (for [{:keys [mapname time]} (data :games)]
-     [mapname time]))
+   (for [{:keys [map time]} (data :games)]
+     [map time])))
 
 (defn parse-game [n]
   (let [[mapname time] (parse-map-and-time n)]
     (if (contains? (knowngames) [mapname time])
       nil
-      (expand n)
-      (let [game {:map mapname, :time time
-                  :players (doall (map #(assoc %1 :pid %2)
-                                       (parse-player-heroes)
-                                       (parse-player-ids)))}]
-        (collapse)
-        game))))
+      (do
+        (expand n)
+        (let [game {:map mapname, :time time
+                    :players (doall (map #(assoc %1 :pid %2)
+                                         (parse-player-heroes)
+                                         (parse-player-ids)))}]
+          (collapse)
+          game)))))
 
 (defn number-of-games [] (count (elements ".rgRow button[value=Expand]")))
 
@@ -151,9 +157,9 @@
 
 (defn scrap-player-games [playerid maxgames]
   (println "Scrapping games of " playerid)
-  (try 
+  (try
     (get-url (str "https://www.hotslogs.com/Player/MatchHistory?PlayerID=" playerid))
-    (set 
+    (set
      (loop [n 0
             games []]
        (if (= maxgames (count games))
@@ -165,7 +171,7 @@
              games)))))
     (catch Exception e
       (prn "Caught "e)
-      [])))
+      {})))
 
 (defn par-scrap-games [playerids maxgames]
   (apply clojure.set/union
@@ -173,8 +179,6 @@
                  (with-driver {:browser browser}
                    (scrap-player-games pid maxgames)))
                playerids)))
-
-(def MAXBROWSERS 4)
 
 (defn scrap-games [playerids maxgames]
   (loop [results #{}
@@ -209,7 +213,7 @@
           (data :games)
           (scrap-games playerids maxgames))))
 
-(defn auto-update-games 
+(defn auto-update-games
   "randomly choose np known players and update the latest ng games of them into data"
   [data np ng]
   (update-games data

@@ -68,18 +68,24 @@
   return a set of lists of all possible
   combinations of those players"
   [players]
-  (for [a (range 5)
-        b (range (inc a) 5)]
+  (for [a (range (count players))
+        b (range (inc a) (count players))]
     #{((vec players) a) ((vec players) b)}))
 
 (defn winners [game]
-  (filter #(%1 :win) (game :players)))
+  (filter #(get %1 :win) (get game :players)))
 
 (defn losers [game]
-  (filter #(not (%1 :win)) (game :players)))
+  (filter #(not (get %1 :win)) (get game :players)))
 
 (defn heronames [players]
   (map #(% :hero) players))
+
+(defn tuple-normalizer [tuple]
+  (/
+   (apply +
+          (for [x tuple] (get-in data [:heroes :all x])))
+   2))
 
 (defn herotuples
   "given a collection of games, return the winrates for all tuples of heroes when more then mingames games are given as evidence"
@@ -89,10 +95,13 @@
          sums (merge-with + wins loss)]
      (into {}
            (for [[tuple sum] sums :when (> sum mingames)]
-             [tuple (/ (if (contains? wins tuple)
-                         (wins tuple)
-                         0)
-                       sum)]))))
+             [tuple
+              (/ (/ (if (contains? wins tuple)
+                      (wins tuple)
+                      0)
+                    sum)
+                 (tuple-normalizer tuple)
+                 0.01)]))))
   ([games] (herotuples games 10)))
 
 (defn print-herostrengths []
