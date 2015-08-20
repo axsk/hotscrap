@@ -121,15 +121,22 @@
    (re-find #"(.*?) \d.*(\d+/\d+/\d{4} \d+:\d+:\d+)")
    (rest)))
 
+(defn knowngames []
+  (set
+   (for [{:keys [mapname time]} (data :games)]
+     [mapname time]))
+
 (defn parse-game [n]
   (let [[mapname time] (parse-map-and-time n)]
-    (expand n)
-    (let [game {:map mapname, :time time
-                :players (doall (map #(assoc %1 :pid %2)
-                                     (parse-player-heroes)
-                                     (parse-player-ids)))}]
-      (collapse)
-      game)))
+    (if (contains? (knowngames) [mapname time])
+      nil
+      (expand n)
+      (let [game {:map mapname, :time time
+                  :players (doall (map #(assoc %1 :pid %2)
+                                       (parse-player-heroes)
+                                       (parse-player-ids)))}]
+        (collapse)
+        game))))
 
 (defn number-of-games [] (count (elements ".rgRow button[value=Expand]")))
 
